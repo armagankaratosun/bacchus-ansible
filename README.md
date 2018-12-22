@@ -15,8 +15,8 @@ This role requires:
 
 ## Supported Platforms
 
-- [Ubuntu - 16.04 (Trusty Tahr)](http://releases.ubuntu.com/16.04/)
-- [Ubuntu - 18.04 (Xenial Xerus)](http://releases.ubuntu.com/18.04/)
+- [Ubuntu - 16.04 (Xenial Xerus)](http://releases.ubuntu.com/16.04/)
+- [Ubuntu - 18.04 (Bionic Beaver)](http://releases.ubuntu.com/18.04/)
 - [CentOS7](http://isoredirect.centos.org/altarch/7/isos/aarch64/CentOS-7-aarch64-Everything-1810.iso)
 - [RHEL7](https://access.redhat.com/articles/754933)
 
