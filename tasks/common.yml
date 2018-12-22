@@ -481,6 +481,21 @@
   
 - name: Start NGINX
   command: "systemctl restart nginx"
+  register: nginx_status
+  ignore_errors: true
+
+- name: add => nginx policy
+  command: ausearch -c 'nginx' --raw | audit2allow -M my-nginx
+  when: nginx_status is failed
+
+- name: enable => nginx policy
+  command: semodule -i my-nginx.pp
+  register: enable_policy
+  when: nginx_status is failed
+
+- name: start => nginx
+  command: "systemctl restart nginx"
+  when: enable_policy is defined
 
 - name: Start Bacchus Web Console
   command: "systemctl restart bacchus"

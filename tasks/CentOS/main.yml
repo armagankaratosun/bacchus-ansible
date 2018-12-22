@@ -35,11 +35,16 @@
    name: nginx
    state: installed
 
+- name: check => SElinux
+  command: getenforce
+  register: selinux
+
 - name: allow => NGINX to connect Django
   seboolean:
    name: httpd_can_network_connect
    state: yes
    persistent: yes
+  when: selinux.stdout != 'Disabled'
 
 - name: upgrade => pip
   command: pip install --upgrade pip
