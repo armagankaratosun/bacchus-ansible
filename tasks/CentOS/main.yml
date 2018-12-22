@@ -1,0 +1,84 @@
+---
+# tasks/RHEL(CentOS)/main.yml: RHEL(CentOS) specific set-up
+# This takes care of base prerequisites for RHEL(CentOS)
+
+- include_vars: "main.yml"
+
+- name: yum => install dependencies
+  yum: name={{item}} state=installed
+  with_items:
+    - gcc
+    - make
+    - python-devel
+    - libxml2-devel
+    - mariadb-devel
+    - git
+    - python2-pip
+
+- name: yum => enable EPEL repo
+  yum:
+   name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+   state: installed
+
+- name: yum => install MariaDB 
+  yum:
+   name: mariadb-server
+   state: installed
+
+- name: yum => install RabbitMQ
+  yum:
+   name: rabbitmq-server
+   state: installed
+
+- name: yum => install NGINX
+  yum:
+   name: nginx
+   state: installed
+
+- name: allow => NGINX to connect Django
+  seboolean:
+   name: httpd_can_network_connect
+   state: yes
+   persistent: yes
+
+- name: upgrade => pip
+  command: pip install --upgrade pip
+
+- name: pip => install wheel
+  pip:
+   name: wheel 
+   
+- name: pip => install django
+  pip:
+   name: django
+   version: 1.10.6
+
+- name: pip => install built-in encyrption
+  pip:
+   name: django-fernet-fields
+
+- name: pip => insatll Ovirt Engine SDK
+  pip:
+   name: ovirt-engine-sdk-python
+   version: 4.1.2
+
+- name:  Python MySQL support
+  pip:
+   name: MySQL-python
+
+- name: pip => install Celery
+  pip:
+   name: celery
+   version: 4.0.2
+
+- name: pip => install Celery Beat
+  pip:
+   name: django-celery-beat
+
+- name: pip => install Celery Results
+  pip:
+   name: django-celery-results
+
+- name: pip => install Flower
+  pip:
+   name: flower

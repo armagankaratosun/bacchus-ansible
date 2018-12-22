@@ -1,0 +1,496 @@
+---
+# tasks/common.yml: common jobs for all distors.
+# This takes care of the common jobs for all distors.
+
+- include_vars: "main.yml"
+
+- name: Start MySQL Server
+  service:
+    name: mariadb
+    state: started
+    enabled: yes
+
+- name: Start RabbitMQ Server
+  service:
+    name: rabbitmq-server
+    state: started
+    enabled: yes
+
+- name: Create the database
+  mysql_db:
+    name: bacchus
+    state: present
+
+- name: Create user on database
+  mysql_user:
+    name: "{{ bacchus_db_user }}"
+    password: "{{ bacchus_db_pass }}" 
+    priv: 'bacchus.*:ALL,GRANT'
+    state: present
+    
+- name: Add RabbitMQ Vhost
+  rabbitmq_vhost:
+    name: bacchus
+    state: present
+
+- name: Create bacchus user on RabbitMQ
+  rabbitmq_user:
+    user: "{{ bacchus_mq_user }}"
+    password: "{{ bacchus_mq_pass }}"
+    vhost: bacchus
+    configure_priv: .*
+    read_priv: .*
+    write_priv: .*
+    tags: Administrator
+    state: present
+
+- name: Add OS user for bacchus
+  user:
+    name: bacchus
+    comment: "Open Bacchus"
+    
+- name: Create Bacchus installation directory
+  file:
+    path: "{{ bacchus_base_path }}"
+    state: directory
+    owner: bacchus
+    group: bacchus
+    mode: 0755
+
+- name: Retrieve Bacchus code from Github repository
+  git:
+    repo: https://github.com/openbacchus/bacchus
+    dest: "{{ bacchus_base_path }}"
+    force: yes
+  become: true
+  become_user: bacchus
+  
+- name: Session setting
+  lineinfile:
+    path: "{{ bacchus_base_path }}/bacchus/settings.py"
+    regexp: 'SESSION_COOKIE_AGE'
+    line: 'SESSION_COOKIE_AGE = {{ session_cookie_age }}'
+  become: true
+  become_user: bacchus
+
+- name: Snapshot persist memory
+  lineinfile:
+    path: "{{ bacchus_base_path }}/bacchus/settings.py"
+    regexp: 'SNAPSHOT_PERSIST_MEMORY'
+    line: 'SNAPSHOT_PERSIST_MEMORY = {{ snapshot_persist_memory }}'
+
+- name: Timezone setting
+  lineinfile:
+    path: "{{ bacchus_base_path }}/bacchus/settings.py"
+    regexp: 'TIME_ZONE'
+    line: "TIME_ZONE = \'{{ timezone }}\'"
+  become: true
+  become_user: bacchus
+
+- name: NGINX settings
+  file:
+    path: "/etc/nginx/conf.d/bacchus.conf"
+    state: touch
+
+- name: NGINX settings
+  blockinfile:
+    path: "/etc/nginx/conf.d/bacchus.conf"
+    block: |
+      server {
+          server_name '{{bacchus_hostname}}';
+          listen {{nginx_ssl_port}} ssl default deferred;
+          ssl_certificate /etc/ssl/certs/bacchus-selfsigned.crt;
+          ssl_certificate_key /etc/ssl/private/bacchus-selfsigned.key;
+          ssl_ciphers ECDH+AESGCM:ECDH+AES256:ECDH+AES128:DH+3DES:!ADH:!AECDH:!MD5;
+          ssl_prefer_server_ciphers on;
+          ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+          location / {
+                	proxy_pass_header Authorization;
+                    proxy_pass http://127.0.0.1:{{bacchus_bind_port}};
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_http_version 1.1;
+                    proxy_set_header Connection "";
+                    proxy_buffering off;
+                    client_max_body_size 0;
+                    proxy_read_timeout 36000s;
+                    proxy_redirect off;
+          }
+      }
+
+- name: Create certificate directories
+  file:
+    path: "/etc/ssl/private"
+    state: directory
+    mode: 0755
+
+- name: Generate SSL self-signed certificate
+  command: openssl req -x509 -nodes -days 3650 -newkey rsa:4096 -keyout /etc/ssl/private/bacchus-selfsigned.key -out /etc/ssl/certs/bacchus-selfsigned.crt -subj "/C=TR/ST=Turkey/L=Istanbul/O=OpenBacchus/CN={{bacchus_hostname}}"
+- name: Database settings
+  blockinfile:
+    path: "{{ bacchus_base_path }}/bacchus/settings.py"
+    block: |
+      DATABASES = {
+        'default': {
+           'ENGINE': 'django.db.backends.mysql',
+           'NAME': 'bacchus',
+           'USER': '{{bacchus_db_user}}',
+           'PASSWORD': '{{bacchus_db_pass}}',
+           'HOST': 'localhost',
+           'PORT': '3306',
+         }
+      }
+      CELERY_BROKER_URL = 'amqp://{{ bacchus_mq_user }}:{{ bacchus_mq_pass }}@localhost:5672/bacchus'
+      BEAT_RESTART_SCRIPT = "{{ bacchus_base_path }}/tools/restart_beat.sh"
+      SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+      EMAIL_HOST = "{{ email_host }}"
+      EMAIL_HOST_USER = "{{ email_host_user }}"
+      EMAIL_HOST_PASSWORD = "{{ email_host_password }}"
+      EMAIL_PORT = {{ email_port }}
+      EMAIL_USE_TLS = {{ email_use_tls }}
+
+- name: Open Bacchus preflight check
+  command: python manage.py check
+  args:
+    chdir: "{{ bacchus_base_path }}"
+  become: true
+  become_user: bacchus
+
+- name: Open Bacchus migrate
+  command: python manage.py migrate
+  args:
+    chdir: "{{ bacchus_base_path }}"
+  become: true
+  become_user: bacchus
+- name: Create tools folder
+  file:
+    path: "{{ bacchus_base_path }}/{{ item }}"
+    state: directory
+    owner: bacchus
+    group: bacchus
+    mode: 0755
+  with_items:
+    - tools
+    - logs
+
+- name: Create script files
+  file:
+    path: "{{ bacchus_base_path }}/tools/{{ item }}"
+    state: touch
+    owner: bacchus
+    group: bacchus
+    mode: 0755
+  with_items:
+    - start_bacchus.sh
+    - stop_bacchus.sh
+    - restart_bacchus.sh
+    - status_bacchus.sh
+    - start_worker.sh
+    - stop_worker.sh
+    - restart_worker.sh
+    - status_worker.sh
+    - start_server.sh
+    - stop_server.sh
+    - restart_server.sh
+    - status_server.sh
+    - start_beat.sh
+    - stop_beat.sh
+    - restart_beat.sh
+    - status_beat.sh
+    - start_flower.sh
+    - stop_flower.sh
+    - restart_flower.sh
+    - status_flower.sh
+
+- name: Flower start script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/start_flower.sh"
+    block: |
+      nohup celery -A bacchus flower --broker=amqp://{{ bacchus_mq_user }}:{{ bacchus_mq_pass }}@localhost:5672/bacchus --basic_auth={{ flower_user }}:{{ flower_pass }} --workdir {{ bacchus_base_path }} >>{{ bacchus_base_path }}/logs/flower.log 2>&1 &
+      echo $! > {{ bacchus_base_path }}/tools/flower.pid
+
+- name: Flower stop script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/stop_flower.sh"
+    block: |
+      if [ -e {{ bacchus_base_path }}/tools/flower.pid ]; then
+         flower_pid=$(cat {{ bacchus_base_path }}/tools/flower.pid)
+         kill -9 $flower_pid
+         rm -f {{ bacchus_base_path }}/tools/flower.pid
+      else
+         echo "[flower] no pid file found"
+      fi
+
+- name: Flower restart script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/restart_flower.sh"
+    block: |
+      {{ bacchus_base_path }}/tools/stop_flower.sh
+      sleep 1
+      {{ bacchus_base_path }}/tools/start_flower.sh
+
+- name: Flower status script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/status_flower.sh"
+    block: |
+      if [ -e {{ bacchus_base_path }}/tools/flower.pid ]; then
+          flower_pid=$(cat {{ bacchus_base_path }}/tools/flower.pid)
+          check_run=$(ps -q $flower_pid |wc -l)
+          if [ $check_run -eq "2" ]; then
+             echo "[flower] running with pid $flower_pid"
+          else
+             echo "[flower] pid exists but no process found"
+          fi
+      else
+          echo "[flower] not running"
+      fi 
+
+- name: Beat start script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/start_beat.sh"
+    block: |
+      nohup celery -A bacchus beat -l info -S django --workdir {{ bacchus_base_path }} >>{{ bacchus_base_path }}/logs/beat.log 2>&1 &        
+      echo $! > {{ bacchus_base_path }}/tools/beat.pid
+
+- name: Beat stop script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/stop_beat.sh"
+    block: |
+      if [ -e {{ bacchus_base_path }}/tools/beat.pid ]; then
+         beat_pid=$(cat {{ bacchus_base_path }}/tools/beat.pid)
+         kill -9 $beat_pid
+         rm -f {{ bacchus_base_path }}/tools/beat.pid
+      else
+         echo "[beat] no pid file found"
+      fi
+
+- name: Beat restart script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/restart_beat.sh"
+    block: |
+      {{ bacchus_base_path }}/tools/stop_beat.sh
+      sleep 1
+      {{ bacchus_base_path }}/tools/start_beat.sh
+
+- name: Beat status script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/status_beat.sh"
+    block: |
+      if [ -e {{ bacchus_base_path }}/tools/beat.pid ]; then
+          beat_pid=$(cat {{ bacchus_base_path }}/tools/beat.pid)
+          check_run=$(ps -q $beat_pid |wc -l)
+          if [ $check_run -eq "2" ]; then
+             echo "[beat] running with pid $beat_pid"
+          else
+             echo "[beat] pid exists but no process found"
+          fi
+      else
+          echo "[beat] not running"
+      fi
+
+- name: Worker start script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/start_worker.sh"
+    block: |
+      nohup celery -A bacchus worker -l info --concurrency={{ worker_concurrency }} -b amqp://{{ bacchus_mq_user }}:{{ bacchus_mq_pass }}@localhost:5672/bacchus --workdir {{ bacchus_base_path }} >>{{ bacchus_base_path }}/logs/worker.log 2>&1 &
+      echo $! > {{ bacchus_base_path }}/tools/worker.pid
+
+- name: Worker stop script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/stop_worker.sh"
+    block: |
+      if [ -e {{ bacchus_base_path }}/tools/worker.pid ]; then
+         worker_pid=$(cat {{ bacchus_base_path }}/tools/worker.pid)
+         pgrep -P $worker_pid |xargs -i kill -9 {}
+         kill -9 $worker_pid
+         rm -f {{ bacchus_base_path }}/tools/worker.pid
+      else
+         echo "[worker] no pid file found"
+      fi
+
+- name: Worker restart script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/restart_worker.sh"
+    block: |
+      {{ bacchus_base_path }}/tools/stop_worker.sh
+      sleep 1
+      {{ bacchus_base_path }}/tools/start_worker.sh
+
+- name: Worker status script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/status_worker.sh"
+    block: |
+      if [ -e {{ bacchus_base_path }}/tools/worker.pid ]; then
+          worker_pid=$(cat {{ bacchus_base_path }}/tools/worker.pid)
+          check_run=$(ps -q $worker_pid |wc -l)
+          if [ $check_run -eq "2" ]; then
+             echo "[worker] running with pid $worker_pid"
+          else
+             echo "[worker] pid exists but no process found"
+          fi
+      else
+          echo "[worker] not running"
+      fi
+
+- name: Server start script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/start_server.sh"
+    block: |
+      nohup python {{ bacchus_base_path }}/manage.py runserver 127.0.0.1:{{bacchus_bind_port}} >{{ bacchus_base_path }}/logs/server.log 2>&1 & 
+      echo $! > {{ bacchus_base_path }}/tools/server.pid
+
+- name: Server stop script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/stop_server.sh"
+    block: |
+      if [ -e {{ bacchus_base_path }}/tools/server.pid ]; then
+         server_pid=$(cat {{ bacchus_base_path }}/tools/server.pid)
+         pgrep -P $server_pid |xargs -i kill -9 {}
+         kill -9 $server_pid
+         rm -f {{ bacchus_base_path }}/tools/server.pid
+      else
+         echo "[server] no pid file found"
+      fi
+
+- name: Server restart script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/restart_server.sh"
+    block: |
+      {{ bacchus_base_path }}/tools/stop_server.sh
+      sleep 1
+      {{ bacchus_base_path }}/tools/start_server.sh
+      
+- name: Server status script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/status_server.sh"
+    block: |
+      if [ -e {{ bacchus_base_path }}/tools/server.pid ]; then
+          server_pid=$(cat {{ bacchus_base_path }}/tools/server.pid)
+          check_run=$(ps -q $server_pid |wc -l)
+          if [ $check_run -eq "2" ]; then
+             echo "[server] running with pid $server_pid"
+          else
+             echo "[server] pid exists but no process found"
+          fi
+      else
+          echo "[server] not running"
+      fi
+
+- name: Bacchus start script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/start_bacchus.sh"
+    block: |
+      {{ bacchus_base_path }}/tools/start_worker.sh
+      {{ bacchus_base_path }}/tools/start_beat.sh
+      {{ bacchus_base_path }}/tools/start_flower.sh
+      {{ bacchus_base_path }}/tools/start_server.sh
+      {{ bacchus_base_path }}/tools/status_worker.sh
+      {{ bacchus_base_path }}/tools/status_beat.sh
+      {{ bacchus_base_path }}/tools/status_flower.sh
+      {{ bacchus_base_path }}/tools/status_server.sh
+
+- name: Bacchus stop script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/stop_bacchus.sh"
+    block: |
+      {{ bacchus_base_path }}/tools/stop_worker.sh
+      {{ bacchus_base_path }}/tools/stop_beat.sh
+      {{ bacchus_base_path }}/tools/stop_flower.sh
+      {{ bacchus_base_path }}/tools/stop_server.sh
+      {{ bacchus_base_path }}/tools/status_worker.sh
+      {{ bacchus_base_path }}/tools/status_beat.sh
+      {{ bacchus_base_path }}/tools/status_flower.sh
+      {{ bacchus_base_path }}/tools/status_server.sh
+
+- name: Bacchus restart script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/restart_bacchus.sh"
+    block: |
+      {{ bacchus_base_path }}/tools/stop_bacchus.sh
+      sleep 1
+      {{ bacchus_base_path }}/tools/start_bacchus.sh
+
+- name: Bacchus status script
+  blockinfile:
+    path: "{{ bacchus_base_path }}/tools/status_bacchus.sh"
+    block: |
+      {{ bacchus_base_path }}/tools/status_worker.sh
+      {{ bacchus_base_path }}/tools/status_beat.sh
+      {{ bacchus_base_path }}/tools/status_flower.sh
+      {{ bacchus_base_path }}/tools/status_server.sh
+
+- name: Create systemd service file
+  file:
+    path: "/etc/systemd/system/bacchus.service"
+    state: touch
+    mode: 0755
+- name: Install systemd service
+  blockinfile:
+    path: "/etc/systemd/system/bacchus.service"
+    block: |
+      [Unit]
+      Description=Bacchus Service
+      After=mariadb.service
+      [Service]
+      Type=oneshot
+      User=bacchus
+      ExecStart=/bin/bash {{ bacchus_base_path }}/tools/start_bacchus.sh
+      ExecStop=/bin/bash {{ bacchus_base_path }}/tools/stop_bacchus.sh
+      RemainAfterExit=yes
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable Bacchus Service
+  command: "systemctl daemon-reload"
+  
+- name: Enable Bacchus Service
+  command: "systemctl enable bacchus"
+
+- name: Enable NGINX
+  command: "systemctl enable nginx"
+
+- debug:
+    msg: "Bacchus installation finished"
+    
+- name: Log the successful installation
+  uri:
+    url: "https://openbacchus.com/install/?email={{ admin_email }}"
+    validate_certs: no
+
+- name: Add Bacchus account
+  command: python manage.py shell -c "from django.contrib.auth.models import User;  User.objects.filter(username='{{ admin_username }}').delete(); User.objects.create_superuser('{{ admin_username }}', '{{ admin_email }}', '{{ admin_password }}')" 
+  args:
+    chdir: "{{ bacchus_base_path }}"
+  become: true
+  become_user: bacchus
+
+- name: E-mail settings
+  command: python manage.py shell -c "from settings.models import Settings; Settings.objects.get_or_create(parameter='mail_to', value='{{ admin_email }}')"
+  args:
+    chdir: "{{ bacchus_base_path }}"
+  become: true
+  become_user: bacchus
+
+- name: Add Inventory Schedule
+  command: python manage.py shell -c "from scheduler.celerytools import CeleryTools; CeleryTools.define_inventory_sched({{ inv_sched_interval }})" 
+  args:
+    chdir: "{{ bacchus_base_path }}"
+  become: true
+  become_user: bacchus
+  
+- name: Start NGINX
+  command: "systemctl restart nginx"
+
+- name: Start Bacchus Web Console
+  command: "systemctl restart bacchus"
+
+- debug:
+    msg: 
+      - "Installation finished. You can access your Bacchus now." 
+      - "URL: https://{{bacchus_hostname}}:{{nginx_ssl_port}}"
+      - "username: {{admin_username}}"
+      - "password: {{admin_password}}"
+      - "--------------------------------------------------------"
+      - "Thank you for using Bacchus. Please donate if you liked it."
+      - "https://www.patreon.com/openbacchus"

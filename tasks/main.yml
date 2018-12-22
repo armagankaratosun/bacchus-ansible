@@ -1,0 +1,14 @@
+---
+# tasks/main.yml: The "Master" playbook
+
+
+- name: Include => Distro Spesific Variables
+  include_vars: "main.yml"
+
+- include: "{{ role_path }}/tasks/{{ ansible_distribution }}/main.yml"
+  when: ansible_distribution != 'Linux Mint'
+ 
+- include: "{{ role_path }}/tasks/Ubuntu/main.yml"
+  when: ansible_distribution == 'Linux Mint'
+
+- include: "{{ role_path }}/tasks/common.yml"
