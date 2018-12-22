@@ -4,6 +4,11 @@
 
 - include_vars: "main.yml"
 
+- name: yum => enable EPEL repo
+  yum:
+   name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+   state: installed
+
 - name: yum => install dependencies
   yum: name={{item}} state=installed
   with_items:
@@ -14,11 +19,6 @@
     - mariadb-devel
     - git
     - python2-pip
-
-- name: yum => enable EPEL repo
-  yum:
-   name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
-   state: installed
 
 - name: yum => install MariaDB 
   yum:
