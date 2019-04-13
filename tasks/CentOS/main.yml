@@ -49,7 +49,7 @@
 - name: upgrade => pip
   command: pip install --upgrade pip
   
-- name: Upgrade setuptools
+- name: upgrade => setuptools
   command: pip install setuptools -U
 
 - name: pip => install wheel
