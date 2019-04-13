@@ -48,6 +48,9 @@
 
 - name: upgrade => pip
   command: pip install --upgrade pip
+  
+- name: Upgrade setuptools
+  command: pip install setuptools -U
 
 - name: pip => install wheel
   pip:
@@ -66,7 +69,6 @@
   pip:
    name: ovirt-engine-sdk-python
    
-
 - name:  Python MySQL support
   pip:
    name: MySQL-python
