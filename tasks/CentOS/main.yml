@@ -65,7 +65,7 @@
 - name: pip => insatll Ovirt Engine SDK
   pip:
    name: ovirt-engine-sdk-python
-   version: 4.1.2
+   
 
 - name:  Python MySQL support
   pip:
