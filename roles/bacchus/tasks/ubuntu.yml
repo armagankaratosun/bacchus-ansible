@@ -9,17 +9,17 @@
 - name: apt => install MariaDB 
   apt:
    name: mariadb-server
-   state: installed
+   state: latest
 
 - name: apt => install RabbitMQ
   apt:
    name: rabbitmq-server
-   state: installed
+   state: latest
 
 - name: apt => install NGINX
   apt:
    name: nginx
-   state: installed
+   state: latest
 
 - name: upgrade => pip
   command: pip install --upgrade pip
