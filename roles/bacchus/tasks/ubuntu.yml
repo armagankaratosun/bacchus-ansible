@@ -3,7 +3,7 @@
 # This takes care of base prerequisites for Ubuntu
 
 - name: apt => install dependencies
-  apt: name={{item}} state=installed
+  apt: name={{item}} state=latest update_cache=yes
   loop: ['software-properties-common', 'gcc', 'make', 'python-dev', 'libxml2-dev', 'libmariadbclient-dev', 'libmariadbd-dev', 'libcurl4-openssl-dev', 'libssl-dev', 'python-semanage', 'git', 'python-pip'] 
 
 - name: apt => install MariaDB 
