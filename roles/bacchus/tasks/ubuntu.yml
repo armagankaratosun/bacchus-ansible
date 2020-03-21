@@ -57,7 +57,6 @@
 - name: pip => install django-timezone-field
   pip:
    name: django-timezone-field 
-   version: 4.0
 
 - name: pip => install Celery Beat
   pip:
