@@ -1,6 +1,6 @@
 ---
 - name: Install OpenBacchus
-  hosts: "{{bacchus_hostname}"
+  hosts: "{{bacchus_hostname}}"
   become: true
   become_user: root
   become_method: sudo
