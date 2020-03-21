@@ -4,19 +4,7 @@
 
 - name: apt => install dependencies
   apt: name={{item}} state=installed
-  with_items:
-    - software-properties-common
-    - gcc
-    - make
-    - python-dev
-    - libxml2-dev
-    - libmariadbclient-dev
-    - libmariadbd-dev
-    - libcurl4-openssl-dev 
-    - libssl-dev
-    - python-semanage
-    - git
-    - python-pip
+  loop: ['software-properties-common', 'gcc', 'make', 'python-dev', 'libxml2-dev', 'libmariadbclient-dev', 'libmariadbd-dev', 'libcurl4-openssl-dev', 'libssl-dev', 'python-semanage', 'git', 'python-pip'] 
   update_cache: yes
 
 - name: apt => install MariaDB 
