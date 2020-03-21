@@ -8,5 +8,4 @@
   tasks:
 
    - name: Include a play after another play
-     include: main.yaml
-    
+     include: "{{ role_path }}/tasks/main.yml
