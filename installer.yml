@@ -6,8 +6,8 @@
   become_method: sudo
   vars_files: default.yml    
 
-tasks:
+  tasks:
 
-  - name: Include a play after another play
-    include: main.yaml
+   - name: Include a play after another play
+     include: ./tasks/main.yaml
     
