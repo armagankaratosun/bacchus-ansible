@@ -21,7 +21,7 @@
 
 - name: Create user on database
   mysql_user:
-    name: "{{ bacchus_db_user }}"
+    name: {{ bacchus_db_user }}
     password: "{{ bacchus_db_pass }}" 
     priv: 'bacchus.*:ALL,GRANT'
     state: present
