@@ -5,7 +5,6 @@
   become_method: sudo
   vars_files: default.yml    
 
-  tasks:
-
-   - name: Include a play after another play
-     include: "{{ role_path }}"/tasks/main.yml
+  roles: 
+      - role: bacchus
+        
