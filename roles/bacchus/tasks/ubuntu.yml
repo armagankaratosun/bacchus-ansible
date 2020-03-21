@@ -61,6 +61,7 @@
 - name: pip => install Celery Beat
   pip:
    name: django-celery-beat
+   version: 1.3.0
 
 - name: pip => install Celery Results
   pip:
