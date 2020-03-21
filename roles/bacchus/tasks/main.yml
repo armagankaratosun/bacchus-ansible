@@ -1,14 +1,12 @@
 ---
-# tasks/main.yml: The "Master" playbook
+ - name: install => bacchus
+   include: ubuntu.yml
+   when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
 
 
-- name: Include => Distro Spesific Variables
-  include_vars: "main.yml"
+ - name: install => bacchus
+   include: centos.yml
+   when: ansible_distribution == 'Centos' or ansible_distribution == 'Red Hat'
 
-- include: "{{ role_path }}/tasks/{{ ansible_distribution }}/main.yml"
-  when: ansible_distribution != 'Linux Mint'
- 
-- include: "{{ role_path }}/tasks/Ubuntu/main.yml"
-  when: ansible_distribution == 'Linux Mint'
-
-- include: "{{ role_path }}/tasks/common.yml"
+ - name: start => common tasks
+   include: common.yml
