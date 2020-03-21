@@ -2,8 +2,6 @@
 # tasks/RHEL(CentOS)/main.yml: RHEL(CentOS) specific set-up
 # This takes care of base prerequisites for RHEL(CentOS)
 
-- include_vars: "main.yml"
-
 - name: yum => enable EPEL repo
   yum:
    name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm

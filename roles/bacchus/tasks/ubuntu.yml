@@ -2,8 +2,6 @@
 # tasks/Ubuntu/main.yml: Ubuntu specific set-up
 # This takes care of base prerequisites for Ubuntu
 
-- include_vars: "main.yml"
-
 - name: apt => install dependencies
   apt: name={{item}} state=installed
   with_items:

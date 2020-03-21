@@ -2,8 +2,6 @@
 # tasks/common.yml: common jobs for all distors.
 # This takes care of the common jobs for all distors.
 
-- include_vars: "main.yml"
-
 - name: Start MySQL Server
   service:
     name: mariadb
