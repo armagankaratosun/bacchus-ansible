@@ -450,11 +450,6 @@
 
 - debug:
     msg: "Bacchus installation finished"
-    
-- name: Log the successful installation
-  uri:
-    url: "https://openbacchus.com/install/?email={{ admin_email }}"
-    validate_certs: no
 
 - name: Add Bacchus account
   command: python manage.py shell -c "from django.contrib.auth.models import User;  User.objects.filter(username='{{ admin_username }}').delete(); User.objects.create_superuser('{{ admin_username }}', '{{ admin_email }}', '{{ admin_password }}')" 
